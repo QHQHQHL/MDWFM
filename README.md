@@ -1,7 +1,7 @@
 # MDWFM
 fusing Landsat-8, Sentinel-1, and Sentinel-2 simultaneously for accurate and stable river water extent mapping
 
-This repositry is the codes for extracting river water information using Multi-dimensional Weighted Fusion Method (MDWFM). This method was implemented in Python.
+This repositry is the codes for extracting river water information using Multi-dimensional Weighted Fusion Method (MDWFM).
 
 Please cite as below if you are using these codes.
 
