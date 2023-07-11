@@ -1,0 +1,308 @@
+exports.SpatialDimension = function (class_img, tongguan) {
+  var ek = ee.Kernel.fixed(3, 3, [[1,1,1],[1,1,1],[1,1,1]], -1, -1);
+
+  var class_imgprocess = class_img.neighborhoodToBands(ek);
+  
+  //print(class_imgprocess);
+  
+  var class_imgprocess_pro = class_img.neighborhoodToBands(ek).unmask(0.0);
+  
+  var spadis_0 = class_img.addBands(ee.Image.constant(ee.Number(1.0)));
+  
+  var spadis_4 = class_img.addBands(ee.Image.constant(ee.Number(1.0).divide(ee.Number(1.0).exp().pow(3))));
+  
+  var spadis_8 = class_img.addBands(ee.Image.constant(ee.Number(1.0).divide(ee.Number(1.414).exp().pow(3))));
+  
+  var spadis_0_0 = spadis_0.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_0_0').unmask(-1).gte(0)).unmask(0);
+  
+  var spadis_4_1 = spadis_4.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_0_-1').unmask(-1).gte(0)).unmask(0);
+  var spadis_4_2 = spadis_4.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_-1_0').unmask(-1).gte(0)).unmask(0);
+  var spadis_4_3 = spadis_4.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_1_0').unmask(-1).gte(0)).unmask(0);
+  var spadis_4_4 = spadis_4.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_0_1').unmask(-1).gte(0)).unmask(0);
+  
+  var spadis_8_1 = spadis_8.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_-1_-1').unmask(-1).gte(0)).unmask(0);
+  var spadis_8_2 = spadis_8.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_1_-1').unmask(-1).gte(0)).unmask(0);
+  var spadis_8_3 = spadis_8.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_-1_1').unmask(-1).gte(0)).unmask(0);
+  var spadis_8_4 = spadis_8.select('constant').clip(tongguan).updateMask(class_imgprocess.select('pro_1_1').unmask(-1).gte(0)).unmask(0);
+  
+  var spadis_weight = spadis_0_0.add(spadis_4_1).add(spadis_4_2).add(spadis_4_3).add(spadis_4_4)
+                              .add(spadis_8_1).add(spadis_8_2).add(spadis_8_3).add(spadis_8_4)
+  
+  var spadis_weight_0 = spadis_0.select('constant').clip(tongguan).divide(spadis_weight);
+  var spadis_weight_4 = spadis_4.select('constant').clip(tongguan).divide(spadis_weight);
+  var spadis_weight_8 = spadis_8.select('constant').clip(tongguan).divide(spadis_weight);
+  
+  var pro_0 = class_imgprocess_pro.select('pro_0_0').multiply(spadis_weight_0);
+  var pro_4 = (class_imgprocess_pro.select('pro_0_-1').add(class_imgprocess_pro.select('pro_-1_0'))
+              .add(class_imgprocess_pro.select('pro_1_0')).add(class_imgprocess_pro.select('pro_0_1'))).multiply(spadis_weight_4);
+  var pro_8 = (class_imgprocess_pro.select('pro_-1_-1').add(class_imgprocess_pro.select('pro_-1_1'))
+              .add(class_imgprocess_pro.select('pro_1_-1')).add(class_imgprocess_pro.select('pro_1_1'))).multiply(spadis_weight_8);
+  var spatial_pro = pro_0.add(pro_4).add(pro_8);
+  
+  return spatial_pro;
+}
+
+exports.corr = function (master, slave) {
+  var ek = ee.Kernel.fixed(3, 3, [[1,1,1],[1,1,1],[1,1,1]], -1, -1);
+  
+  var cloud1 = master.select('cloud');
+  var cloud2 = slave.select('cloud');
+  
+  master = master.select('pro').updateMask(cloud2);
+  slave = slave.select('pro').updateMask(cloud1);
+  
+  var Nsum_class_master = master.select('pro').neighborhoodToBands(ek).unmask(-1).gte(0);
+  var Nsum_class_slave = slave.select('pro').neighborhoodToBands(ek).unmask(-1).gte(0);
+  
+  var Nsum_img = Nsum_class_master.select('pro_-1_-1')
+            .add(Nsum_class_master.select('pro_0_-1'))
+            .add(Nsum_class_master.select('pro_1_-1'))
+            .add(Nsum_class_master.select('pro_-1_0'))
+            .add(Nsum_class_master.select('pro_1_0'))
+            .add(Nsum_class_master.select('pro_-1_1'))
+            .add(Nsum_class_master.select('pro_0_1'))
+            .add(Nsum_class_master.select('pro_1_1'))
+            .add(Nsum_class_master.select('pro_0_0')).updateMask(cloud2).updateMask(cloud1);
+  
+  var Pro_class_master = master.select('pro').neighborhoodToBands(ek).unmask(0);
+  var Pro_class_slave = slave.select('pro').neighborhoodToBands(ek).unmask(0);
+  
+  var Mean_class_master = Pro_class_master.select('pro_-1_-1')
+            .add(Pro_class_master.select('pro_0_-1'))
+            .add(Pro_class_master.select('pro_1_-1'))
+            .add(Pro_class_master.select('pro_-1_0'))
+            .add(Pro_class_master.select('pro_1_0'))
+            .add(Pro_class_master.select('pro_-1_1'))
+            .add(Pro_class_master.select('pro_0_1'))
+            .add(Pro_class_master.select('pro_1_1'))
+            .add(Pro_class_master.select('pro_0_0')).updateMask(cloud2).updateMask(cloud1)
+            .divide(Nsum_img)
+            .rename('M');
+            
+  var Mean_class_slave = Pro_class_slave.select('pro_-1_-1')
+            .add(Pro_class_slave.select('pro_0_-1'))
+            .add(Pro_class_slave.select('pro_1_-1'))
+            .add(Pro_class_slave.select('pro_-1_0'))
+            .add(Pro_class_slave.select('pro_1_0'))
+            .add(Pro_class_slave.select('pro_-1_1'))
+            .add(Pro_class_slave.select('pro_0_1'))
+            .add(Pro_class_slave.select('pro_1_1'))
+            .add(Pro_class_slave.select('pro_0_0')).updateMask(cloud2).updateMask(cloud1)
+            .divide(Nsum_img)
+            .rename('M');
+  
+  var C_class_master = master.select('pro').neighborhoodToBands(ek).updateMask(cloud2).updateMask(cloud1);
+  var C_class_slave = slave.select('pro').neighborhoodToBands(ek).updateMask(cloud2).updateMask(cloud1);
+  
+  var Cor_master = master.select('pro').rename('pro_0_0')
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_-1_-1'), C_class_master.select('pro_-1_-1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_0_-1'), C_class_master.select('pro_0_-1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_1_-1'), C_class_master.select('pro_1_-1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_-1_0'), C_class_master.select('pro_-1_0')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_1_0'), C_class_master.select('pro_1_0')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_-1_1'), C_class_master.select('pro_-1_1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_0_1'), C_class_master.select('pro_0_1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_master.rename('pro_1_1'), C_class_master.select('pro_1_1')]).mosaic());
+  
+  var Cor_slave = slave.select('pro').rename('pro_0_0')
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_-1_-1'), C_class_slave.select('pro_-1_-1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_0_-1'), C_class_slave.select('pro_0_-1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_1_-1'), C_class_slave.select('pro_1_-1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_-1_0'), C_class_slave.select('pro_-1_0')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_1_0'), C_class_slave.select('pro_1_0')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_-1_1'), C_class_slave.select('pro_-1_1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_0_1'), C_class_slave.select('pro_0_1')]).mosaic())
+                 .addBands(ee.ImageCollection([Mean_class_slave.rename('pro_1_1'), C_class_slave.select('pro_1_1')]).mosaic());
+  
+  var mastersubM = Cor_master.subtract(Mean_class_master);
+  var slavesubM = Cor_slave.subtract(Mean_class_slave);
+  var fenzi = mastersubM.multiply(slavesubM);
+  var fenzi_v1 = fenzi.select('pro_-1_-1')
+            .add(fenzi.select('pro_0_-1'))
+            .add(fenzi.select('pro_1_-1'))
+            .add(fenzi.select('pro_-1_0'))
+            .add(fenzi.select('pro_1_0'))
+            .add(fenzi.select('pro_-1_1'))
+            .add(fenzi.select('pro_0_1'))
+            .add(fenzi.select('pro_1_1'))
+            .add(fenzi.select('pro_0_0')).updateMask(cloud2).updateMask(cloud1);
+  
+  var fenmu1 = mastersubM.multiply(mastersubM);
+  var fenmu1_v1 = fenmu1.select('pro_-1_-1')
+            .add(fenmu1.select('pro_0_-1'))
+            .add(fenmu1.select('pro_1_-1'))
+            .add(fenmu1.select('pro_-1_0'))
+            .add(fenmu1.select('pro_1_0'))
+            .add(fenmu1.select('pro_-1_1'))
+            .add(fenmu1.select('pro_0_1'))
+            .add(fenmu1.select('pro_1_1'))
+            .add(fenmu1.select('pro_0_0')).updateMask(cloud2).updateMask(cloud1);
+          
+  var fenmu2 = slavesubM.multiply(slavesubM);
+  var fenmu2_v1 = fenmu2.select('pro_-1_-1')
+            .add(fenmu2.select('pro_0_-1'))
+            .add(fenmu2.select('pro_1_-1'))
+            .add(fenmu2.select('pro_-1_0'))
+            .add(fenmu2.select('pro_1_0'))
+            .add(fenmu2.select('pro_-1_1'))
+            .add(fenmu2.select('pro_0_1'))
+            .add(fenmu2.select('pro_1_1'))
+            .add(fenmu2.select('pro_0_0')).updateMask(cloud2).updateMask(cloud1);
+  
+  var fenmu = (fenmu1_v1.multiply(fenmu2_v1)).sqrt();
+  var Corr_result = (fenzi_v1.divide(fenmu)).rename('Corr')
+  Corr_result = (Corr_result.add(1.0)).divide(2.0);
+  Corr_result = Corr_result.updateMask(cloud2).updateMask(cloud1).unmask(1.0);
+  Corr_result = Corr_result.updateMask(cloud2).unmask(0.0);
+  return Corr_result;
+}
+
+exports.PCR6_4D = function (Spa_pro, Tem_pro, Sep_pro, Qua_pro) {
+  var water_Spa_pro = Spa_pro;
+  var water_Tem_pro = Tem_pro;
+  var water_Sep_pro = Sep_pro;
+  var water_Qua_pro = Qua_pro;
+  var land_Spa_pro = Spa_pro.subtract(1.0).abs();
+  var land_Tem_pro = Tem_pro.subtract(1.0).abs();
+  var land_Sep_pro = Sep_pro.subtract(1.0).abs();
+  var land_Qua_pro = Qua_pro.subtract(1.0).abs();
+
+  var PCR6_f1 = water_Spa_pro.multiply(water_Tem_pro).multiply(water_Sep_pro).multiply(water_Qua_pro);
+
+  //PCR6_m1
+  var PCR6_m1_lll = (land_Tem_pro.multiply(land_Sep_pro).multiply(land_Qua_pro)).divide(water_Spa_pro.add(land_Tem_pro).add(land_Sep_pro).add(land_Qua_pro));
+  var PCR6_m1_llw = (land_Tem_pro.multiply(land_Sep_pro).multiply(water_Qua_pro)).divide(water_Spa_pro.add(land_Tem_pro).add(land_Sep_pro).add(water_Qua_pro));
+  var PCR6_m1_lwl = (land_Tem_pro.multiply(water_Sep_pro).multiply(land_Qua_pro)).divide(water_Spa_pro.add(land_Tem_pro).add(water_Sep_pro).add(land_Qua_pro));
+  var PCR6_m1_wll = (water_Tem_pro.multiply(land_Sep_pro).multiply(land_Qua_pro)).divide(water_Spa_pro.add(water_Tem_pro).add(land_Sep_pro).add(land_Qua_pro));
+  var PCR6_m1_wwl = (water_Tem_pro.multiply(water_Sep_pro).multiply(land_Qua_pro)).divide(water_Spa_pro.add(water_Tem_pro).add(water_Sep_pro).add(land_Qua_pro));
+  var PCR6_m1_wlw = (water_Tem_pro.multiply(land_Sep_pro).multiply(water_Qua_pro)).divide(water_Spa_pro.add(water_Tem_pro).add(land_Sep_pro).add(water_Qua_pro));
+  var PCR6_m1_lww = (land_Tem_pro.multiply(water_Sep_pro).multiply(water_Qua_pro)).divide(water_Spa_pro.add(land_Tem_pro).add(water_Sep_pro).add(water_Qua_pro));
+  var PCR_m1_sum = PCR6_m1_lll.add(PCR6_m1_llw).add(PCR6_m1_lwl).add(PCR6_m1_wll).add(PCR6_m1_wwl).add(PCR6_m1_wlw).add(PCR6_m1_lww);
+  var PCR_m1 = water_Spa_pro.multiply(water_Spa_pro).multiply(PCR_m1_sum);
+
+  //PCR6_m2
+  var PCR6_m2_lll = (land_Spa_pro.multiply(land_Sep_pro).multiply(land_Qua_pro)).divide(water_Tem_pro.add(land_Spa_pro).add(land_Sep_pro).add(land_Qua_pro));
+  var PCR6_m2_llw = (land_Spa_pro.multiply(land_Sep_pro).multiply(water_Qua_pro)).divide(water_Tem_pro.add(land_Spa_pro).add(land_Sep_pro).add(water_Qua_pro));
+  var PCR6_m2_lwl = (land_Spa_pro.multiply(water_Sep_pro).multiply(land_Qua_pro)).divide(water_Tem_pro.add(land_Spa_pro).add(water_Sep_pro).add(land_Qua_pro));
+  var PCR6_m2_wll = (water_Spa_pro.multiply(land_Sep_pro).multiply(land_Qua_pro)).divide(water_Tem_pro.add(water_Spa_pro).add(land_Sep_pro).add(land_Qua_pro));
+  var PCR6_m2_wwl = (water_Spa_pro.multiply(water_Sep_pro).multiply(land_Qua_pro)).divide(water_Tem_pro.add(water_Spa_pro).add(water_Sep_pro).add(land_Qua_pro));
+  var PCR6_m2_wlw = (water_Spa_pro.multiply(land_Sep_pro).multiply(water_Qua_pro)).divide(water_Tem_pro.add(water_Spa_pro).add(land_Sep_pro).add(water_Qua_pro));
+  var PCR6_m2_lww = (land_Spa_pro.multiply(water_Sep_pro).multiply(water_Qua_pro)).divide(water_Tem_pro.add(land_Spa_pro).add(water_Sep_pro).add(water_Qua_pro));
+  var PCR_m2_sum = PCR6_m2_lll.add(PCR6_m2_llw).add(PCR6_m2_lwl).add(PCR6_m2_wll).add(PCR6_m2_wwl).add(PCR6_m2_wlw).add(PCR6_m2_lww);
+  var PCR_m2 = water_Tem_pro.multiply(water_Tem_pro).multiply(PCR_m2_sum);
+
+  //PCR6_m3
+  var PCR6_m3_lll = (land_Spa_pro.multiply(land_Tem_pro).multiply(land_Qua_pro)).divide(water_Sep_pro.add(land_Spa_pro).add(land_Tem_pro).add(land_Qua_pro));
+  var PCR6_m3_llw = (land_Spa_pro.multiply(land_Tem_pro).multiply(water_Qua_pro)).divide(water_Sep_pro.add(land_Spa_pro).add(land_Tem_pro).add(water_Qua_pro));
+  var PCR6_m3_lwl = (land_Spa_pro.multiply(water_Tem_pro).multiply(land_Qua_pro)).divide(water_Sep_pro.add(land_Spa_pro).add(water_Tem_pro).add(land_Qua_pro));
+  var PCR6_m3_wll = (water_Spa_pro.multiply(land_Tem_pro).multiply(land_Qua_pro)).divide(water_Sep_pro.add(water_Spa_pro).add(land_Tem_pro).add(land_Qua_pro));
+  var PCR6_m3_wwl = (water_Spa_pro.multiply(water_Tem_pro).multiply(land_Qua_pro)).divide(water_Sep_pro.add(water_Spa_pro).add(water_Tem_pro).add(land_Qua_pro));
+  var PCR6_m3_wlw = (water_Spa_pro.multiply(land_Tem_pro).multiply(water_Qua_pro)).divide(water_Sep_pro.add(water_Spa_pro).add(land_Tem_pro).add(water_Qua_pro));
+  var PCR6_m3_lww = (land_Spa_pro.multiply(water_Tem_pro).multiply(water_Qua_pro)).divide(water_Sep_pro.add(land_Spa_pro).add(water_Tem_pro).add(water_Qua_pro));
+  var PCR_m3_sum = PCR6_m3_lll.add(PCR6_m3_llw).add(PCR6_m3_lwl).add(PCR6_m3_wll).add(PCR6_m3_wwl).add(PCR6_m3_wlw).add(PCR6_m3_lww);
+  var PCR_m3 = water_Sep_pro.multiply(water_Sep_pro).multiply(PCR_m3_sum);
+
+  //PCR6_m4
+  var PCR6_m4_lll = (land_Spa_pro.multiply(land_Tem_pro).multiply(land_Sep_pro)).divide(water_Qua_pro.add(land_Spa_pro).add(land_Tem_pro).add(land_Sep_pro));
+  var PCR6_m4_llw = (land_Spa_pro.multiply(land_Tem_pro).multiply(water_Sep_pro)).divide(water_Qua_pro.add(land_Spa_pro).add(land_Tem_pro).add(water_Sep_pro));
+  var PCR6_m4_lwl = (land_Spa_pro.multiply(water_Tem_pro).multiply(land_Sep_pro)).divide(water_Qua_pro.add(land_Spa_pro).add(water_Tem_pro).add(land_Sep_pro));
+  var PCR6_m4_wll = (water_Spa_pro.multiply(land_Tem_pro).multiply(land_Sep_pro)).divide(water_Qua_pro.add(water_Spa_pro).add(land_Tem_pro).add(land_Sep_pro));
+  var PCR6_m4_wwl = (water_Spa_pro.multiply(water_Tem_pro).multiply(land_Sep_pro)).divide(water_Qua_pro.add(water_Spa_pro).add(water_Tem_pro).add(land_Sep_pro));
+  var PCR6_m4_wlw = (water_Spa_pro.multiply(land_Tem_pro).multiply(water_Sep_pro)).divide(water_Qua_pro.add(water_Spa_pro).add(land_Tem_pro).add(water_Sep_pro));
+  var PCR6_m4_lww = (land_Spa_pro.multiply(water_Tem_pro).multiply(water_Sep_pro)).divide(water_Qua_pro.add(land_Spa_pro).add(water_Tem_pro).add(water_Sep_pro));
+  var PCR_m4_sum = PCR6_m4_lll.add(PCR6_m4_llw).add(PCR6_m4_lwl).add(PCR6_m4_wll).add(PCR6_m4_wwl).add(PCR6_m4_wlw).add(PCR6_m4_lww);
+  var PCR_m4 = water_Qua_pro.multiply(water_Qua_pro).multiply(PCR_m4_sum);
+
+  var PCR6 = PCR6_f1.add(PCR_m1).add(PCR_m2).add(PCR_m3).add(PCR_m4);
+
+  return PCR6;
+}
+
+exports.PCR6_3D = function (Tem_pro, Sep_pro, Qua_pro) {
+  var water_Tem_pro = Tem_pro;
+  var water_Sep_pro = Sep_pro;
+  var water_Qua_pro = Qua_pro;
+  var land_Tem_pro = Tem_pro.subtract(1.0).abs();
+  var land_Sep_pro = Sep_pro.subtract(1.0).abs();
+  var land_Qua_pro = Qua_pro.subtract(1.0).abs();
+  
+  var PCR6_f1 = water_Tem_pro.multiply(water_Sep_pro).multiply(water_Qua_pro);
+  
+  //PCR6_m1
+  var PCR6_m1_ll = (land_Sep_pro.multiply(land_Qua_pro)).divide(water_Tem_pro.add(land_Sep_pro).add(land_Qua_pro));
+  var PCR6_m1_lw = (land_Sep_pro.multiply(water_Qua_pro)).divide(water_Tem_pro.add(land_Sep_pro).add(water_Qua_pro));
+  var PCR6_m1_wl = (water_Sep_pro.multiply(land_Qua_pro)).divide(water_Tem_pro.add(water_Sep_pro).add(land_Qua_pro));
+  var PCR_m1_sum = PCR6_m1_ll.add(PCR6_m1_lw).add(PCR6_m1_wl);
+  var PCR_m1 = water_Tem_pro.multiply(water_Tem_pro).multiply(PCR_m1_sum);
+  //PCR6_m2
+  var PCR6_m2_ll = (land_Tem_pro.multiply(land_Qua_pro)).divide(water_Sep_pro.add(land_Tem_pro).add(land_Qua_pro));
+  var PCR6_m2_lw = (land_Tem_pro.multiply(water_Qua_pro)).divide(water_Sep_pro.add(land_Tem_pro).add(water_Qua_pro));
+  var PCR6_m2_wl = (water_Tem_pro.multiply(land_Qua_pro)).divide(water_Sep_pro.add(water_Tem_pro).add(land_Qua_pro));
+  var PCR_m2_sum = PCR6_m2_ll.add(PCR6_m2_lw).add(PCR6_m2_wl);
+  var PCR_m2 = water_Sep_pro.multiply(water_Sep_pro).multiply(PCR_m2_sum);
+  //PCR6_m3
+  var PCR6_m3_ll = (land_Tem_pro.multiply(land_Sep_pro)).divide(water_Qua_pro.add(land_Tem_pro).add(land_Sep_pro));
+  var PCR6_m3_lw = (land_Tem_pro.multiply(water_Sep_pro)).divide(water_Qua_pro.add(land_Tem_pro).add(water_Sep_pro));
+  var PCR6_m3_wl = (water_Tem_pro.multiply(land_Sep_pro)).divide(water_Qua_pro.add(water_Tem_pro).add(land_Sep_pro));
+  var PCR_m3_sum = PCR6_m3_ll.add(PCR6_m3_lw).add(PCR6_m3_wl);
+  var PCR_m3 = water_Qua_pro.multiply(water_Qua_pro).multiply(PCR_m3_sum);
+  
+  var PCR6 = PCR6_f1.add(PCR_m1).add(PCR_m2).add(PCR_m3);
+  return PCR6
+}
+
+exports.OTSU = function(histogram) {
+  var counts = ee.Array(ee.Dictionary(histogram).get('histogram'));
+  var means = ee.Array(ee.Dictionary(histogram).get('bucketMeans'));
+  var size = means.length().get([0]);
+  var total = counts.reduce(ee.Reducer.sum(), [0]).get([0]);
+  var sum = means.multiply(counts).reduce(ee.Reducer.sum(), [0]).get([0]);
+  var mean = sum.divide(total);
+  var indices = ee.List.sequence(1, size);
+  var bss = indices.map(function(i) {
+    var aCounts = counts.slice(0, 0, i);
+    var aCount = aCounts.reduce(ee.Reducer.sum(), [0]).get([0]);
+    var aMeans = means.slice(0, 0, i);
+    var aMean = aMeans.multiply(aCounts)
+                      .reduce(ee.Reducer.sum(), [0]).get([0])
+                      .divide(aCount);
+    var bCount = total.subtract(aCount);
+    var bMean = sum.subtract(aCount.multiply(aMean)).divide(bCount);
+    return aCount.multiply(aMean.subtract(mean).pow(2)).add(
+           bCount.multiply(bMean.subtract(mean).pow(2)));
+  });
+  return means.sort(bss).get([-1]);
+}
+
+exports.GetCenterline = function(clDataset, bound) {
+  // filter the GRWL centerline based on area of interest
+  var cl = clDataset.filterBounds(bound); 
+  return(cl);
+};
+exports.ExtractChannel = function(image, centerline, maxDistance) {
+  // extract the channel water bodies from the water mask, based on connectivity to the reference centerline.
+  var connectedToCl = image.not().cumulativeCost({
+    source: ee.Image().toByte().paint(centerline, 1).and(image), // only use the centerline that overlaps with the water mask
+    maxDistance: maxDistance,
+    geodeticDistance: false
+  }).eq(0);
+
+  var channel = image.updateMask(connectedToCl).unmask(0).updateMask(image.gte(0)).rename(['channelMask']);
+  return channel;
+};
+exports.RemoveIsland = function(channel, FILL_SIZE) {
+  /* fill in island as water if the size (number of pixels) of the island is smaller than FILL_SIZE */
+  var fill = channel.not().selfMask().connectedPixelCount(FILL_SIZE).lt(FILL_SIZE);
+  var river = channel.where(fill, ee.Image(1)).rename(['riverMask']);
+  return(river);
+};
+
+exports.ExtractRiver = function(imgIn, clData, maxDist, minIslandRemoval) {
+  
+  var waterMask = imgIn.select('waterMask');
+  var bound = waterMask.geometry();
+  var cl = exports.GetCenterline(clData, bound);
+  var channelMask = exports.ExtractChannel(waterMask, cl, maxDist);
+  var riverMask = exports.RemoveIsland(channelMask, minIslandRemoval);
+  return(imgIn.addBands(channelMask).addBands(riverMask));
+};
